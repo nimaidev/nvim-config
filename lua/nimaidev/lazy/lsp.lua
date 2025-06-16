@@ -1,8 +1,19 @@
 return {
     "neovim/nvim-lspconfig",
     dependencies = {
-        "williamboman/mason.nvim",
-        "williamboman/mason-lspconfig.nvim",
+        {
+            "williamboman/mason.nvim",
+            config = function()
+                require("mason").setup()
+            end,
+        },
+        {
+            "williamboman/mason-lspconfig.nvim",
+            config = function()
+                -- Don't call setup here to avoid the automatic_enable error
+                -- We'll handle LSP server installation manually
+            end,
+        },
         "hrsh7th/cmp-nvim-lsp",
         "hrsh7th/cmp-buffer",
         "hrsh7th/cmp-path",
@@ -10,48 +21,83 @@ return {
         "hrsh7th/nvim-cmp",
         "L3MON4D3/LuaSnip",
         "saadparwaiz1/cmp_luasnip",
-        "j-hui/fidget.nvim",
+        {
+            "j-hui/fidget.nvim",
+            config = function()
+                require("fidget").setup({})
+            end,
+        },
     },
 
     config = function()
-        local cmp = require('cmp')
-        local cmp_lsp = require("cmp_nvim_lsp")
+        local cmp_status, cmp = pcall(require, 'cmp')
+        if not cmp_status then
+            vim.notify("nvim-cmp not found", vim.log.levels.ERROR)
+            return
+        end
+
+        local cmp_lsp_status, cmp_lsp = pcall(require, "cmp_nvim_lsp")
+        if not cmp_lsp_status then
+            vim.notify("cmp_nvim_lsp not found", vim.log.levels.ERROR)
+            return
+        end
+
+        local lspconfig_status, lspconfig = pcall(require, "lspconfig")
+        if not lspconfig_status then
+            vim.notify("lspconfig not found", vim.log.levels.ERROR)
+            return
+        end
+
         local capabilities = vim.tbl_deep_extend(
             "force",
             {},
             vim.lsp.protocol.make_client_capabilities(),
             cmp_lsp.default_capabilities())
 
-        require("fidget").setup({})
-        require("mason").setup()
-        require("mason-lspconfig").setup({
-            ensure_installed = {
-                "lua_ls",
-                "rust_analyzer",
-                "tsserver",
-            },
-            handlers = {
-                function(server_name) -- default handler (optional)
+        -- Install LSP servers manually through Mason if needed
+        local mason_registry_status, mason_registry = pcall(require, "mason-registry")
+        if mason_registry_status then
+            local servers = { 
+                "lua-language-server", 
+                "rust-analyzer", 
+                "typescript-language-server", 
+                "pyright",
+                "gopls"
+             }
+            for _, server in ipairs(servers) do
+                if not mason_registry.is_installed(server) then
+                    vim.cmd("MasonInstall " .. server)
+                end
+            end
+        end
 
-                    require("lspconfig")[server_name].setup {
-                        capabilities = capabilities
+        -- Setup LSP servers directly
+        lspconfig.lua_ls.setup({
+            capabilities = capabilities,
+            settings = {
+                Lua = {
+                    diagnostics = {
+                        globals = { "vim", "it", "describe", "before_each", "after_each" },
                     }
-                end,
-
-                ["lua_ls"] = function()
-                    local lspconfig = require("lspconfig")
-                    lspconfig.lua_ls.setup {
-                        capabilities = capabilities,
-                        settings = {
-                            Lua = {
-                                diagnostics = {
-                                    globals = { "vim", "it", "describe", "before_each", "after_each" },
-                                }
-                            }
-                        }
-                    }
-                end,
+                }
             }
+        })
+        
+        lspconfig.rust_analyzer.setup({
+            capabilities = capabilities,
+        })
+        
+        lspconfig.ts_ls.setup({
+            capabilities = capabilities,
+        })
+
+        lspconfig.pyright.setup({
+            capabilities = capabilities,
+
+        })
+
+        lspconfig.gopls.setup({
+            capabilities = capabilities,
         })
 
         local cmp_select = { behavior = cmp.SelectBehavior.Select }
@@ -59,7 +105,10 @@ return {
         cmp.setup({
             snippet = {
                 expand = function(args)
-                    require('luasnip').lsp_expand(args.body) -- For `luasnip` users.
+                    local luasnip_status, luasnip = pcall(require, 'luasnip')
+                    if luasnip_status then
+                        luasnip.lsp_expand(args.body)
+                    end
                 end,
             },
             mapping = cmp.mapping.preset.insert({
@@ -70,7 +119,7 @@ return {
             }),
             sources = cmp.config.sources({
                 { name = 'nvim_lsp' },
-                { name = 'luasnip' }, -- For luasnip users.
+                { name = 'luasnip' },
             }, {
                 { name = 'buffer' },
             })
