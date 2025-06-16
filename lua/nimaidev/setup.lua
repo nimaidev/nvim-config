@@ -29,7 +29,7 @@ vim.opt.incsearch = true
 vim.opt.termguicolors= true
 
 -- scroll
-vim.opt.scrolloff = 8
+vim.opt.scrolloff = 0
 
 -- sign column for linting and git
 vim.opt.signcolumn = "yes"
