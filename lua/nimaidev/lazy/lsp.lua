@@ -16,13 +16,11 @@ return {
     config = function()
         local cmp = require('cmp')
         local cmp_lsp = require("cmp_nvim_lsp")
-        local lspconfig = require("lspconfig")
         local capabilities = vim.tbl_deep_extend(
             "force",
             {},
             vim.lsp.protocol.make_client_capabilities(),
-            cmp_lsp.default_capabilities()
-        )
+            cmp_lsp.default_capabilities())
 
         require("fidget").setup({})
         require("mason").setup()
@@ -30,15 +28,18 @@ return {
             ensure_installed = {
                 "lua_ls",
                 "rust_analyzer",
-                "pyright",
-                "ruff",
+                "tsserver",
             },
-            -- automatic_installation = true,
             handlers = {
-                function(server_name)
-                    lspconfig[server_name].setup { capabilities = capabilities }
+                function(server_name) -- default handler (optional)
+
+                    require("lspconfig")[server_name].setup {
+                        capabilities = capabilities
+                    }
                 end,
+
                 ["lua_ls"] = function()
+                    local lspconfig = require("lspconfig")
                     lspconfig.lua_ls.setup {
                         capabilities = capabilities,
                         settings = {
@@ -50,48 +51,33 @@ return {
                         }
                     }
                 end,
-                ["pyright"] = function()
-                    lspconfig.pyright.setup {
-                        capabilities = capabilities,
-                        settings = {
-                            python = {
-                                analysis = {
-                                    autoSearchPaths = true,
-                                    diagnosticMode = "workspace",
-                                    useLibraryCodeForTypes = true,
-                                    typeCheckingMode = "basic",
-                                },
-                            },
-                        },
-                    }
-                end,
-                ["ruff"] = function()
-                    lspconfig.ruff.setup { capabilities = capabilities }
-                end,
             }
         })
+
+        local cmp_select = { behavior = cmp.SelectBehavior.Select }
 
         cmp.setup({
             snippet = {
                 expand = function(args)
-                    require('luasnip').lsp_expand(args.body)
+                    require('luasnip').lsp_expand(args.body) -- For `luasnip` users.
                 end,
             },
             mapping = cmp.mapping.preset.insert({
-                ['<C-p>'] = cmp.mapping.select_prev_item({ behavior = cmp.SelectBehavior.Select }),
-                ['<C-n>'] = cmp.mapping.select_next_item({ behavior = cmp.SelectBehavior.Select }),
+                ['<C-p>'] = cmp.mapping.select_prev_item(cmp_select),
+                ['<C-n>'] = cmp.mapping.select_next_item(cmp_select),
                 ['<C-y>'] = cmp.mapping.confirm({ select = true }),
                 ["<C-Space>"] = cmp.mapping.complete(),
             }),
             sources = cmp.config.sources({
                 { name = 'nvim_lsp' },
-                { name = 'luasnip' },
+                { name = 'luasnip' }, -- For luasnip users.
             }, {
                 { name = 'buffer' },
             })
         })
 
         vim.diagnostic.config({
+            -- update_in_insert = true,
             float = {
                 focusable = false,
                 style = "minimal",
